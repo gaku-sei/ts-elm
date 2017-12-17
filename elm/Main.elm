@@ -1,39 +1,39 @@
-port module Main exposing (..)
+port module Main
+    exposing
+        ( Model
+        , Msg(Convert)
+        , Done
+        , failed
+        , init
+        , mainBuilder
+        , subscriptions
+        )
 
-import Json.Decode as Decode exposing (Value)
+import Json.Decode as Decode exposing (Decoder, Value)
 import Platform exposing (program)
-
-
-type Msg
-    = ConvertUser Value
-    | DoneConvertUser User
-    | FailedConvertUser String
 
 
 type alias Model =
     ()
 
 
-type alias User =
-    { name : String
-    , tags : List Int
-    }
+type Msg
+    = Convert Value
 
 
-userDecoder : Decode.Decoder User
-userDecoder =
-    Decode.map2 User
-        (Decode.field "name" Decode.string)
-        (Decode.field "tags" <| Decode.list Decode.int)
+type alias Done a msg =
+    a -> Cmd msg
 
 
-port convertUser : (Value -> msg) -> Sub msg
+port convert : (Value -> msg) -> Sub msg
 
 
-port doneConvertUser : User -> Cmd msg
+port failed : String -> Cmd msg
 
 
-port failedConvertUser : String -> Cmd msg
+subscriptions : Model -> Sub Msg
+subscriptions _ =
+    convert Convert
 
 
 init : ( Model, Cmd Msg )
@@ -41,35 +41,28 @@ init =
     () ! []
 
 
-subscriptions : Model -> Sub Msg
-subscriptions _ =
-    convertUser ConvertUser
+update : Done a Msg -> Decoder a -> Msg -> Model -> ( Model, Cmd Msg )
+update done decoder msg model =
+    let
+        (Convert value) =
+            msg
+
+        userResult =
+            Decode.decodeValue Decode.string value
+                |> Result.andThen (Decode.decodeString decoder)
+    in
+        case userResult of
+            Ok user ->
+                model ! [ done user ]
+
+            Err error ->
+                model ! [ failed error ]
 
 
-update : Msg -> Model -> ( Model, Cmd Msg )
-update msg model =
-    case msg of
-        ConvertUser value ->
-            let
-                userResult =
-                    Decode.decodeValue Decode.string value
-                        |> Result.andThen (Decode.decodeString userDecoder)
-            in
-                case userResult of
-                    Ok user ->
-                        model ! [ doneConvertUser user ]
-
-                    Err error ->
-                        model ! [ failedConvertUser error ]
-
-        _ ->
-            model ! []
-
-
-main : Program Never Model Msg
-main =
+mainBuilder : Done a Msg -> Decoder a -> Program Never Model Msg
+mainBuilder done decoder =
     program
         { init = init
         , subscriptions = subscriptions
-        , update = update
+        , update = update done decoder
         }

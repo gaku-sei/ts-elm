@@ -1,14 +1,14 @@
-import { Main } from "../elm/Main";
+import { Converters } from "../elm/Converters/User";
 
-const app = Main.worker();
+const app = Converters.User.worker();
 
-app.ports.doneConvertUser.subscribe(user => {
+app.ports.done.subscribe(user => {
   console.log(user.name, user.tags);
 });
 
-app.ports.failedConvertUser.subscribe(error => {
+app.ports.failed.subscribe(error => {
   console.log(error);
 });
 
-app.ports.convertUser.send(`{ "name": "test", "tags": [1, 2, 3] }`);
-app.ports.convertUser.send(`"will fail"`);
+app.ports.convert.send(`{ "name": "test", "tags": [1, 2, 3] }`);
+app.ports.convert.send(`"will fail"`);
